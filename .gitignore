@@ -1,0 +1,12 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.DS_Store
+.standalone-check-*/
+.env
+.env.*
+!.env.example
+.agents/
+.codex/
