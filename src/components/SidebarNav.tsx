@@ -19,7 +19,13 @@ function clip(bounds: Bounds | null) {
   return `inset(${y}px calc(100% - ${x + width}px) calc(100% - ${y + height}px) ${x}px round 6px)`;
 }
 
-export function SidebarNav({ children }: { children: ReactNode }) {
+export function SidebarNav({
+  children,
+  label = 'Playbook navigation',
+}: {
+  children: ReactNode;
+  label?: string;
+}) {
   const contentRef = useRef<HTMLDivElement>(null);
   const pointer = useRef<{ x: number; y: number } | null>(null);
   const [active, setActive] = useState<Bounds | null>(null);
@@ -31,15 +37,18 @@ export function SidebarNav({ children }: { children: ReactNode }) {
     const content = contentRef.current;
     if (!content) return;
     const origin = content.getBoundingClientRect();
+    // Gallery thumbnails scale the entire sidebar; clip-path uses unscaled CSS pixels.
+    const scaleX = content.offsetWidth ? origin.width / content.offsetWidth : 1;
+    const scaleY = content.offsetHeight ? origin.height / content.offsetHeight : 1;
     const bounds = (row: Element | null): Bounds | null => {
       if (!row || !origin.width || !row.getClientRects().length) return null;
       const rect = row.getBoundingClientRect();
       const round = (value: number) => Math.round(value * 100) / 100;
       return {
-        x: round(rect.x - origin.x),
-        y: round(rect.y - origin.y),
-        width: round(rect.width),
-        height: round(rect.height),
+        x: round((rect.x - origin.x) / scaleX),
+        y: round((rect.y - origin.y) / scaleY),
+        width: round(rect.width / scaleX),
+        height: round(rect.height / scaleY),
       };
     };
     const selected = content.querySelector(activeSelector);
@@ -93,7 +102,7 @@ export function SidebarNav({ children }: { children: ReactNode }) {
   return (
     <nav
       className="sidebar-nav"
-      aria-label="Playbook navigation"
+      aria-label={label}
       onPointerMove={onPointerMove}
       onPointerLeave={() => {
         pointer.current = null;

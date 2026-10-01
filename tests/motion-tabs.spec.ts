@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
 
 for (const width of [1440, 360]) {
-  test(`sliding tabs stay on one horizontal track at ${width}px`, async ({ page }) => {
+  test(`tabs stay on one horizontal track at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
-    await page.goto('/#/pattern/sliding-tabs');
+    await page.goto('/#/pattern/motion-tabs');
     await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible();
 
     for (const label of ['Settings', 'Overview', 'Activity']) {
-      const motion = await page.locator('.segmented').evaluate(async (list, label) => {
-        const highlight = () => list.querySelector('.segment-highlight')!.getBoundingClientRect();
+      const motion = await page.locator('.control-tab-list').evaluate(async (list, label) => {
+        const highlight = () =>
+          list.querySelector('.control-tab-indicator')!.getBoundingClientRect();
         const start = highlight().toJSON();
         const trackTop = list.getBoundingClientRect().top;
         const target = [...list.querySelectorAll<HTMLElement>('[role="tab"]')].find(
@@ -48,13 +49,11 @@ for (const width of [1440, 360]) {
   });
 }
 
-test('sliding tabs handle quick reversals, keyboard input, and reduced motion', async ({
-  page,
-}) => {
-  await page.goto('/#/pattern/sliding-tabs');
+test('tabs handle quick reversals, keyboard input, and reduced motion', async ({ page }) => {
+  await page.goto('/#/pattern/motion-tabs');
   const overview = page.getByRole('tab', { name: 'Overview' });
   const settings = page.getByRole('tab', { name: 'Settings' });
-  const indicator = page.locator('.segment-highlight');
+  const indicator = page.locator('.control-tab-indicator');
   await settings.click();
   await overview.click();
   await settings.click();

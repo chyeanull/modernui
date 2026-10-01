@@ -1,10 +1,17 @@
 import { useId, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Dialog } from '@base-ui/react/dialog';
-import { Tabs } from '@base-ui/react/tabs';
 import { Command } from 'cmdk';
 import {
   ArrowUpRight,
+  Asterisk,
+  Bookmark,
+  BookOpen,
+  Compass,
+  Layers,
+  MousePointer2,
+  Orbit,
   Bell,
   Calendar,
   Check,
@@ -23,6 +30,116 @@ import {
   X,
 } from 'lucide-react';
 import { DemoStack, Hint, spring, usePlayback } from './shared';
+import { SidebarNav } from '../components/SidebarNav';
+
+export function SlidingSidebar() {
+  const [active, setActive] = useState('Sliding tabs');
+  const [expanded, setExpanded] = useState(['Navigation']);
+  const id = useId();
+  const groups = [
+    {
+      name: 'Navigation',
+      icon: Compass,
+      items: ['Magnetic dock', 'Sliding tabs', 'Sliding sidebar'],
+    },
+    { name: 'Microinteractions', icon: MousePointer2, items: ['Like burst', 'Progress ring'] },
+    { name: 'Cards & overlays', icon: Layers, items: ['Morphing modal', 'Expanding card'] },
+    { name: 'Visual effects', icon: Orbit, items: ['Shader mesh', 'Border beam'] },
+  ];
+  const link = (name: string) => ({
+    href: `#${id}-${name.toLowerCase().replace(/\W+/g, '-')}`,
+    onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      setActive(name);
+    },
+    'aria-current': active === name ? ('page' as const) : undefined,
+  });
+  return (
+    <DemoStack>
+      <div className="sidebar-study">
+        <div className="sidebar-study-brand">
+          <span>
+            <Asterisk size={23} />
+          </span>
+          <strong>
+            modern<span>ui</span>.
+          </strong>
+        </div>
+        <SidebarNav label="Example sidebar">
+          <a
+            {...link('Your collection')}
+            className={`nav-item ${active === 'Your collection' ? 'active' : ''}`}
+          >
+            <Bookmark size={16} />
+            <span>Your collection</span>
+            <span className="nav-count">3</span>
+          </a>
+          <div className="nav-label">THE PATTERNS</div>
+          {groups.map(({ name, icon: Icon, items }, index) => {
+            const open = expanded.includes(name);
+            const selected = active === name || (!open && items.includes(active));
+            return (
+              <div className="nav-category" key={name}>
+                <div className={`nav-category-row ${selected ? 'active' : ''}`}>
+                  <a {...link(name)}>
+                    <Icon size={16} />
+                    <span>{name}</span>
+                  </a>
+                  <button
+                    aria-label={`${open ? 'Collapse' : 'Expand'} ${name}`}
+                    aria-expanded={open}
+                    aria-controls={`${id}-group-${index}`}
+                    onClick={() =>
+                      setExpanded((current) =>
+                        open ? current.filter((item) => item !== name) : [...current, name],
+                      )
+                    }
+                  >
+                    <ChevronRight
+                      size={13}
+                      style={{ transform: open ? 'rotate(90deg)' : undefined }}
+                    />
+                  </button>
+                </div>
+                <div id={`${id}-group-${index}`} hidden={!open}>
+                  {open && (
+                    <div className="nav-children">
+                      {items.map((name) => (
+                        <a key={name} {...link(name)} className={active === name ? 'active' : ''}>
+                          {name}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          <div className="nav-label notebook-label">THE NOTEBOOK</div>
+          <a
+            {...link('Design foundations')}
+            className={`nav-item ${active === 'Design foundations' ? 'active' : ''}`}
+          >
+            <Settings size={16} />
+            <span>Design foundations</span>
+          </a>
+          <a
+            {...link('Research & sources')}
+            className={`nav-item ${active === 'Research & sources' ? 'active' : ''}`}
+          >
+            <BookOpen size={16} />
+            <span>Research & sources</span>
+            <ArrowUpRight size={13} />
+          </a>
+        </SidebarNav>
+        <div className="sidebar-study-status" role="status">
+          {active}
+        </div>
+      </div>
+      <Hint>Hover to explore · click to select</Hint>
+    </DemoStack>
+  );
+}
 
 export function MagneticDock() {
   const [active, setActive] = useState('Home');
@@ -67,61 +184,6 @@ export function MagneticDock() {
         ))}
       </div>
       <Hint>{active} selected · hover to explore</Hint>
-    </DemoStack>
-  );
-}
-export function SlidingTabs() {
-  const [value, setValue] = useState('Overview');
-  const [keyboard, setKeyboard] = useState(false);
-  const { reduced } = usePlayback();
-  const labels = ['Overview', 'Activity', 'Settings'];
-  return (
-    <DemoStack>
-      <Tabs.Root value={value} onValueChange={(v) => setValue(String(v))} className="tabs-demo">
-        <Tabs.List
-          className="segmented"
-          activateOnFocus
-          onKeyDown={() => setKeyboard(true)}
-          onPointerDown={() => setKeyboard(false)}
-        >
-          <span
-            className="segment-highlight"
-            aria-hidden="true"
-            data-instant={keyboard || reduced || undefined}
-            style={{ transform: `translateX(${labels.indexOf(value) * 100}%)` }}
-          />
-          {labels.map((label) => (
-            <Tabs.Tab key={label} value={label} className="segment">
-              <span>{label}</span>
-            </Tabs.Tab>
-          ))}
-        </Tabs.List>
-        <div className="tabs-panels">
-          {labels.map((label, i) => (
-            <Tabs.Panel key={label} value={label} className="tabs-body">
-              <span className="demo-eyebrow">YOUR WORKSPACE</span>
-              <h3>
-                {
-                  [
-                    'Everything in its place.',
-                    'A little progress, every day.',
-                    'Make yourself at home.',
-                  ][i]
-                }
-              </h3>
-              <p>
-                {
-                  [
-                    '12 projects. One clear view.',
-                    'All your latest updates, together.',
-                    'A workspace that feels like yours.',
-                  ][i]
-                }
-              </p>
-            </Tabs.Panel>
-          ))}
-        </div>
-      </Tabs.Root>
     </DemoStack>
   );
 }

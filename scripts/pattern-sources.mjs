@@ -21,6 +21,7 @@ const categories = [
 export const sourceInputs = [
   ...categories.map((name) => `src/demos/${name}.tsx`),
   'src/demos/shared.tsx',
+  'src/components/SidebarNav.tsx',
   'src/demos/registry.ts',
   'src/demos/demos.css',
   'src/styles.css',
@@ -81,18 +82,29 @@ function dependenciesFor(entry, imports, declarations) {
   const needed = new Set();
   traverse(ast, {
     Program(program) {
+      const types = new Map(
+        program
+          .get('body')
+          .filter((path) => path.isTSTypeAliasDeclaration() || path.isTSInterfaceDeclaration())
+          .map((path) => [path.node.id.name, path]),
+      );
       function visit(name) {
         if (needed.has(name)) return;
         needed.add(name);
         const binding = program.scope.getBinding(name);
+        const declaration = binding?.path ?? types.get(name);
         if (
-          !binding ||
-          binding.path.isImportSpecifier() ||
-          binding.path.isImportDefaultSpecifier() ||
-          binding.path.isImportNamespaceSpecifier()
+          !declaration ||
+          declaration.isImportSpecifier() ||
+          declaration.isImportDefaultSpecifier() ||
+          declaration.isImportNamespaceSpecifier()
         )
           return;
-        binding.path.traverse({
+        declaration.traverse({
+          TSTypeReference(path) {
+            const typeName = path.node.typeName;
+            if (typeName.type === 'Identifier' && types.has(typeName.name)) visit(typeName.name);
+          },
           'Identifier|JSXIdentifier'(path) {
             // JSX prop names (such as animate) and object keys are not imports.
             if (!path.isReferenced()) return;
@@ -194,7 +206,9 @@ function componentCss(id, body, demoCss, appCss) {
     }
     return null;
   }
-  for (const node of demoCss.nodes) {
+  // The sidebar study reuses the app's actual navigation, including its styles.
+  const styleNodes = id === 'sliding-sidebar' ? [...appCss.nodes, ...demoCss.nodes] : demoCss.nodes;
+  for (const node of styleNodes) {
     const kept = filter(node);
     if (kept) root.append(kept);
   }
@@ -234,6 +248,7 @@ export async function generatePatternSources(rootDir = process.cwd()) {
     categories.map((name) => [name, moduleParts(contents[`src/demos/${name}.tsx`])]),
   );
   const shared = moduleParts(contents['src/demos/shared.tsx']);
+  const sidebar = moduleParts(contents['src/components/SidebarNav.tsx']);
   const demoCss = postcss.parse(contents['src/demos/demos.css']);
   const appCss = postcss.parse(contents['src/styles.css']);
   const versions = JSON.parse(contents['package.json']).dependencies;
@@ -253,11 +268,16 @@ export async function generatePatternSources(rootDir = process.cwd()) {
     await Promise.all(
       entries.map(async ({ id, category, name }) => {
         const module = modules[category];
+        const helpers = id === 'sliding-sidebar' ? sidebar : { imports: [], declarations: [] };
         const available = new Map();
-        for (const specifier of [...module.imports, ...shared.imports]) {
+        for (const specifier of [...module.imports, ...shared.imports, ...helpers.imports]) {
           if (!specifier.from.startsWith('.')) available.set(specifier.local, specifier);
         }
-        const declarations = new Map([...shared.declarations, ...module.declarations]);
+        const declarations = new Map([
+          ...shared.declarations,
+          ...helpers.declarations,
+          ...module.declarations,
+        ]);
         const selected = dependenciesFor(name, [...available.values()], declarations);
         const usesMotion = selected.imports.some((s) => s.from === 'motion/react');
         const usesToast = selected.imports.some((s) => s.local === 'toast' && s.from === 'sonner');
@@ -300,7 +320,10 @@ export async function generatePatternSources(rootDir = process.cwd()) {
         const css = componentCss(id, selected.body, demoCss, appCss);
         const content = selected.body
           .replace(`function ${name}(`, 'function PatternContent(')
-          .replace(/<(Dialog|Menu|ContextMenu)\.Portal>/g, `<$1.Portal className="pattern-${id}">`);
+          .replace(
+            /<(Dialog|Menu|ContextMenu|Select|Combobox)\.Portal>/g,
+            `<$1.Portal className="pattern-${id}">`,
+          );
         const cssLiteral = css.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
         const code = `'use client';
       ${importText(imports)}

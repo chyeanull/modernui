@@ -3,14 +3,24 @@ import { motion } from 'motion/react';
 import { ArrowUpRight, Check, Layers, Pause, Play, Sparkles } from 'lucide-react';
 import { DemoStack, Hint, usePlayback } from './shared';
 
-export function MeshGradient() {
+export function FlowShader({
+  palette = 0,
+  flow = 1,
+  className,
+  onFallback,
+}: {
+  palette?: number;
+  flow?: number;
+  className?: string;
+  onFallback?: () => void;
+}) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const elapsedRef = useRef(0);
-  const [palette, setPalette] = useState(0);
-  const [flow, setFlow] = useState(1);
   const [fallback, setFallback] = useState(false);
   const { paused, reduced, speed } = usePlayback();
-  const id = useId();
+  useEffect(() => {
+    if (fallback) onFallback?.();
+  }, [fallback, onFallback]);
   useEffect(() => {
     const el = canvas.current;
     if (!el) return;
@@ -25,7 +35,7 @@ export function MeshGradient() {
     const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
     gl.shaderSource(
       fs,
-      `precision mediump float;uniform vec2 resolution;uniform float time;uniform float palette;void main(){vec2 uv=gl_FragCoord.xy/resolution;float t=time*.24;vec2 p=uv*3.;float f=sin(p.x*1.5+t+sin(p.y*2.-t))*.5+.5;float g=sin(p.y*2.+t*.7+cos(p.x*2.+t))*.5+.5;vec3 a=vec3(.98,.78,.57);vec3 b=vec3(.92,.28,.23);vec3 c=vec3(.48,.42,.73);if(palette>.5){a=vec3(.67,.88,.85);b=vec3(.12,.40,.59);c=vec3(.37,.38,.73);}if(palette>1.5){a=vec3(.90,.91,.70);b=vec3(.25,.49,.37);c=vec3(.67,.72,.36);}vec3 color=mix(mix(a,b,f),c,g*.7);float grain=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453);color+=(grain-.5)*.04;gl_FragColor=vec4(color,1.);}`,
+      `precision mediump float;uniform vec2 resolution;uniform float time;uniform float palette;void main(){vec2 uv=gl_FragCoord.xy/resolution;float t=time*.24;vec2 p=uv*3.;float f=sin(p.x*1.5+t+sin(p.y*2.-t))*.5+.5;float g=sin(p.y*2.+t*.7+cos(p.x*2.+t))*.5+.5;vec3 a=vec3(.98,.78,.57);vec3 b=vec3(.92,.28,.23);vec3 c=vec3(.48,.42,.73);if(palette>.5){a=vec3(.67,.88,.85);b=vec3(.12,.40,.59);c=vec3(.37,.38,.73);}if(palette>1.5){a=vec3(.90,.91,.70);b=vec3(.25,.49,.37);c=vec3(.67,.72,.36);}if(palette>2.5){a=vec3(1.,.749,.459);b=vec3(.906,.361,.212);c=vec3(.710,.227,.110);}vec3 color=mix(mix(a,b,f),c,g*.7);float grain=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453);color+=(grain-.5)*.04;gl_FragColor=vec4(color,1.);}`,
     );
     gl.compileShader(fs);
     const program = gl.createProgram()!;
@@ -53,6 +63,7 @@ export function MeshGradient() {
     const resolution = gl.getUniformLocation(program, 'resolution'),
       time = gl.getUniformLocation(program, 'time'),
       pal = gl.getUniformLocation(program, 'palette');
+    const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
     let raf = 0,
       visible = true,
       elapsed = elapsedRef.current,
@@ -70,10 +81,11 @@ export function MeshGradient() {
         gl.viewport(0, 0, w, h);
       }
       gl.uniform2f(resolution, w, h);
-      gl.uniform1f(time, reduced ? 2 : elapsed);
+      const still = reduced || motionPreference.matches;
+      gl.uniform1f(time, still ? 2 : elapsed);
       gl.uniform1f(pal, palette);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
-      if (!paused && !reduced && visible && !document.hidden) raf = requestAnimationFrame(draw);
+      if (!paused && !still && visible && !document.hidden) raf = requestAnimationFrame(draw);
     };
     const restart = () => {
       cancelAnimationFrame(raf);
@@ -85,7 +97,10 @@ export function MeshGradient() {
       restart();
     });
     observer.observe(el);
+    const resize = new ResizeObserver(restart);
+    resize.observe(el);
     document.addEventListener('visibilitychange', restart);
+    motionPreference.addEventListener('change', restart);
     draw(0);
     const lost = (e: Event) => {
       e.preventDefault();
@@ -96,7 +111,9 @@ export function MeshGradient() {
     return () => {
       cancelAnimationFrame(raf);
       observer.disconnect();
+      resize.disconnect();
       document.removeEventListener('visibilitychange', restart);
+      motionPreference.removeEventListener('change', restart);
       el.removeEventListener('webglcontextlost', lost);
       gl.deleteBuffer(buffer);
       gl.deleteProgram(program);
@@ -105,9 +122,25 @@ export function MeshGradient() {
     };
   }, [palette, flow, paused, reduced, speed]);
   return (
+    <canvas
+      ref={canvas}
+      className={className}
+      style={fallback ? { opacity: 0 } : undefined}
+      aria-label="Animated abstract color field"
+      role="img"
+    />
+  );
+}
+
+export function MeshGradient() {
+  const [palette, setPalette] = useState(0);
+  const [flow, setFlow] = useState(1);
+  const [fallback, setFallback] = useState(false);
+  const id = useId();
+  return (
     <div className="mesh-demo">
       <div className={`shader-window palette-${palette}`}>
-        <canvas ref={canvas} aria-label="Animated abstract color field" role="img" />
+        <FlowShader palette={palette} flow={flow} onFallback={() => setFallback(true)} />
         <div className="shader-label">
           <strong>flow.</strong>
           <small>{fallback ? 'CSS color fallback' : 'A study in continuous color'}</small>
@@ -189,13 +222,10 @@ export function ParticleField() {
     if (!ctx) return;
     let raf = 0,
       visible = true;
-    const points = Array.from({ length: density }, (_, i) => ({
-      x: ((i * 73 + 17) % 997) / 997,
-      y: ((i * 137 + 43) % 991) / 991,
-    }));
     const draw = () => {
       const w = el.clientWidth,
         h = el.clientHeight;
+      if (!w || !h) return;
       const dpr = Math.min(devicePixelRatio, 2);
       if (el.width !== w * dpr || el.height !== h * dpr) {
         el.width = w * dpr;
@@ -203,9 +233,15 @@ export function ParticleField() {
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      points.forEach((p) => {
-        const x = p.x * w,
-          y = p.y * h;
+      // Complete rows and columns with equal spacing, centered inside the canvas.
+      const columns = Math.max(2, Math.round(Math.sqrt((density * w) / h)));
+      const rows = Math.max(2, Math.round(density / columns));
+      const spacing = Math.min(w / (columns + 1), h / (rows + 1));
+      const left = (w - (columns - 1) * spacing) / 2;
+      const top = (h - (rows - 1) * spacing) / 2;
+      for (let index = 0; index < columns * rows; index++) {
+        const x = left + (index % columns) * spacing,
+          y = top + Math.floor(index / columns) * spacing;
         const dx = x - pointer.current.x,
           dy = y - pointer.current.y;
         const distance = Math.hypot(dx, dy);
@@ -218,9 +254,9 @@ export function ParticleField() {
           0,
           Math.PI * 2,
         );
-        ctx.fillStyle = distance < 110 ? '#ee7a50' : '#869993';
+        ctx.fillStyle = !reduced && distance < 110 ? '#ee7a50' : '#869993';
         ctx.fill();
-      });
+      }
       if (!paused && !reduced && visible && !document.hidden) raf = requestAnimationFrame(draw);
     };
     const restart = () => {
@@ -232,11 +268,14 @@ export function ParticleField() {
       restart();
     });
     observer.observe(el);
+    const resizeObserver = new ResizeObserver(restart);
+    resizeObserver.observe(el);
     document.addEventListener('visibilitychange', restart);
     draw();
     return () => {
       cancelAnimationFrame(raf);
       observer.disconnect();
+      resizeObserver.disconnect();
       document.removeEventListener('visibilitychange', restart);
     };
   }, [density, paused, reduced]);
@@ -249,7 +288,10 @@ export function ParticleField() {
           aria-label="Decorative interactive particle field"
           onPointerMove={(e) => {
             const r = e.currentTarget.getBoundingClientRect();
-            pointer.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+            pointer.current = {
+              x: ((e.clientX - r.left) * e.currentTarget.clientWidth) / r.width,
+              y: ((e.clientY - r.top) * e.currentTarget.clientHeight) / r.height,
+            };
           }}
           onPointerLeave={() => {
             pointer.current = { x: -999, y: -999 };
@@ -301,22 +343,65 @@ export function Aurora() {
 }
 export function GrainGradient() {
   const [grain, setGrain] = useState(30);
+  const [playing, setPlaying] = useState(true);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const { paused, reduced } = usePlayback();
   const id = useId();
-  const filter = useId().replace(/:/g, '');
+  useEffect(() => {
+    const element = canvas.current;
+    const context = element?.getContext('2d');
+    if (!element || !context) return;
+    element.width = 320;
+    element.height = 220;
+    const pixels = context.createImageData(element.width, element.height);
+    let frame = 0,
+      last = 0,
+      visible = true;
+    const paint = () => {
+      for (let offset = 0; offset < pixels.data.length; offset += 4) {
+        const shade = Math.floor(Math.random() * 256);
+        pixels.data[offset] = shade;
+        pixels.data[offset + 1] = shade;
+        pixels.data[offset + 2] = shade;
+        pixels.data[offset + 3] = 255;
+      }
+      context.putImageData(pixels, 0, 0);
+    };
+    const tick = (now: number) => {
+      if (now - last >= 50) {
+        paint();
+        last = now;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    const restart = () => {
+      cancelAnimationFrame(frame);
+      if (playing && !paused && !reduced && visible && !document.hidden)
+        frame = requestAnimationFrame(tick);
+    };
+    const observer = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      restart();
+    });
+    observer.observe(element);
+    document.addEventListener('visibilitychange', restart);
+    paint();
+    restart();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', restart);
+    };
+  }, [playing, paused, reduced]);
   return (
     <DemoStack className="effect-demo">
       <div className="grain-window">
-        <svg className="grain-svg" aria-hidden="true" style={{ opacity: grain / 100 }}>
-          <filter id={filter}>
-            <feTurbulence
-              type="fractalNoise"
-              baseFrequency=".85"
-              numOctaves="3"
-              stitchTiles="stitch"
-            />
-          </filter>
-          <rect width="100%" height="100%" filter={`url(#${filter})`} />
-        </svg>
+        <canvas
+          className="grain-noise"
+          ref={canvas}
+          aria-hidden="true"
+          style={{ opacity: grain / 100 }}
+        />
         <span>
           Imperfect,
           <br />
@@ -335,6 +420,14 @@ export function GrainGradient() {
         />
         <output>{grain}%</output>
       </label>
+      <button
+        className="demo-text-button"
+        disabled={reduced || paused}
+        onClick={() => setPlaying(!playing)}
+      >
+        {playing ? <Pause size={13} /> : <Play size={13} />}
+        {reduced ? 'Static grain · reduced motion' : playing ? 'Pause grain' : 'Animate grain'}
+      </button>
     </DemoStack>
   );
 }
@@ -452,5 +545,45 @@ export function GlassSurface() {
         </label>
       </div>
     </DemoStack>
+  );
+}
+
+export function ScrollExpand() {
+  const [progress, setProgress] = useState(0);
+  const { reduced } = usePlayback();
+  const scale = reduced ? 1 : 0.58 + progress * 0.42;
+  return (
+    <div
+      className="scroll-expand"
+      tabIndex={0}
+      aria-label="Scrollable landscape expansion demo"
+      onScroll={(e) => setProgress(Math.min(1, e.currentTarget.scrollTop / 240))}
+    >
+      <div className="scroll-expand-track">
+        <div className="scroll-expand-sticky">
+          <div
+            className="expand-landscape"
+            style={{
+              transform: `scale(${scale})`,
+              borderRadius: reduced ? 0 : 48 * (1 - progress),
+            }}
+          >
+            <span className="landscape-sun" />
+            <i className="landscape-hill landscape-far" />
+            <i className="landscape-hill landscape-near" />
+            <div>
+              <h3>
+                Let the world
+                <br />
+                open up.
+              </h3>
+            </div>
+          </div>
+          <span className="scroll-instruction">
+            {progress > 0.8 ? 'A little more room to breathe.' : 'SCROLL TO EXPLORE ↓'}
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -4,7 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 
 test.use({ reducedMotion: 'reduce' });
 
-const routes = ['', 'pattern/sliding-tabs', 'research', 'foundations', 'saved'];
+const routes = ['', 'pattern/motion-tabs', 'research', 'foundations', 'saved'];
 
 async function auditShell(page: Page, minimum = 12) {
   const issues = await page.evaluate((minimum) => {
@@ -99,17 +99,17 @@ test('navigation and search stay readable with enlarged text', async ({ page }) 
   await expect(page.getByRole('combobox')).toBeVisible();
   await expect(page.getByRole('combobox')).toHaveCSS('font-size', '32px');
   await auditShell(page, 24);
-  await page.getByRole('combobox').fill('sliding tabs');
+  await page.getByRole('combobox').fill('tabs');
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/sliding-tabs/);
+  await expect(page).toHaveURL(/motion-tabs/);
 });
 
 test('app type is larger while playground and source sizes are preserved', async ({ page }) => {
-  await page.goto('/#/pattern/sliding-tabs');
+  await page.goto('/#/pattern/motion-tabs');
   await expect(page.locator('.nav-item').first()).toHaveCSS('font-size', '16px');
   await expect(page.locator('.detail-title p')).toHaveCSS('font-size', '16px');
   await expect(page.locator('.pattern-notes p').first()).toHaveCSS('font-size', '16px');
-  await expect(page.locator('.segment').first()).toHaveCSS('font-size', '11px');
+  await expect(page.locator('.control-tab').first()).toHaveCSS('font-size', '13px');
   await page.getByRole('button', { name: 'Source', exact: true }).click();
   await expect(page.locator('.source-view pre')).toHaveCSS('font-size', '11px');
   await expect(page.locator('.source-view pre')).toHaveCSS('line-height', '20.35px');

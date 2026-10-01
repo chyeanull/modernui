@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import NumberFlow from '@number-flow/react';
 import {
   ArrowDown,
   ArrowLeft,
@@ -12,6 +13,8 @@ import {
   Globe,
   Image,
   LoaderCircle,
+  ListTodo,
+  Pause,
   Paperclip,
   Play,
   Search,
@@ -22,6 +25,180 @@ import {
   X,
 } from 'lucide-react';
 import { DemoStack, Hint, Replay, spring, usePlayback, useTicker } from './shared';
+
+export function AgentTodoList() {
+  const tasks = [
+    'Review the project structure',
+    'Build the new component',
+    'Check keyboard interactions',
+    'Prepare the finished preview',
+  ];
+  const ticksPerTask = 8;
+  const total = tasks.length * ticksPerTask;
+  const [{ tick, open }, setRun] = useState({ tick: 0, open: true });
+  const [running, setRunning] = useState(true);
+  const [keyboard, setKeyboard] = useState(false);
+  const { reduced, paused } = usePlayback();
+  const id = useId();
+  const completed = Math.floor(tick / ticksPerTask);
+  const finished = tick === total;
+  useTicker(
+    () =>
+      setRun((current) => {
+        const next = Math.min(current.tick + 1, total);
+        return { tick: next, open: next === total ? false : current.open };
+      }),
+    running && !finished ? 280 : null,
+  );
+  return (
+    <div className="agent-todo-demo" data-reduced={reduced || undefined}>
+      <section className="agent-todo-card" aria-label="Agent task plan" data-complete={finished}>
+        <button
+          id={`${id}-trigger`}
+          className="agent-todo-header"
+          aria-expanded={open}
+          aria-controls={`${id}-tasks`}
+          onPointerDown={() => setKeyboard(false)}
+          onKeyDown={() => setKeyboard(true)}
+          onClick={() => setRun((current) => ({ ...current, open: !current.open }))}
+        >
+          <span className="agent-todo-heading-icon" aria-hidden="true">
+            <ListTodo size={19} style={{ opacity: finished ? 0 : 1 }} />
+            <span className="agent-todo-success" style={{ opacity: finished ? 1 : 0 }}>
+              <Check size={14} />
+            </span>
+          </span>
+          <span className="agent-todo-title">Implementation plan</span>
+          <span className="sr-only">
+            {completed} of {tasks.length} tasks completed
+          </span>
+          <span className="agent-todo-count" aria-hidden="true">
+            <NumberFlow value={completed} animated={!reduced} />/{tasks.length}
+          </span>
+          <ChevronDown
+            size={15}
+            className="agent-todo-chevron"
+            aria-hidden="true"
+            style={{
+              transform: `rotate(${open ? 180 : 0}deg)`,
+              transitionDuration: reduced || keyboard ? '0s' : undefined,
+            }}
+          />
+        </button>
+        <div
+          id={`${id}-tasks`}
+          role="region"
+          aria-labelledby={`${id}-trigger`}
+          aria-hidden={!open}
+          inert={!open}
+          className="agent-todo-disclosure"
+          data-open={open}
+          style={{ transitionDuration: reduced || keyboard ? '0s' : undefined }}
+        >
+          <div className="agent-todo-clip">
+            <ol className="agent-todo-list">
+              {tasks.map((title, index) => {
+                const status =
+                  index < completed ? 'complete' : index === completed ? 'running' : 'pending';
+                const progress =
+                  status === 'running'
+                    ? Math.round((((tick % ticksPerTask) + 1) / ticksPerTask) * 100)
+                    : 0;
+                return (
+                  <li key={title} className="agent-todo-row" data-status={status}>
+                    <svg className="agent-todo-mark" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeDasharray={status === 'pending' ? '2 3' : undefined}
+                        opacity={status === 'running' ? 0.2 : 0.65}
+                      />
+                      <circle
+                        className="agent-todo-progress"
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        pathLength="100"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeDasharray="100"
+                        strokeDashoffset={100 - progress}
+                        opacity={status === 'running' ? 1 : 0}
+                        transform="rotate(-90 12 12)"
+                      />
+                      <path
+                        className="agent-todo-check"
+                        d="m7.5 12 3 3 6-6"
+                        pathLength="1"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeDasharray="1"
+                        strokeDashoffset={status === 'complete' ? 0 : 1}
+                        opacity={status === 'complete' ? 1 : 0}
+                      />
+                    </svg>
+                    <span className="sr-only">
+                      {status === 'complete'
+                        ? 'Completed'
+                        : status === 'running'
+                          ? 'In progress'
+                          : 'Pending'}
+                      :{' '}
+                    </span>
+                    <span className="agent-todo-task">
+                      <span>{title}</span>
+                    </span>
+                    {status === 'running' && (
+                      <span className="agent-todo-percent">{progress}%</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
+      </section>
+      <div className="agent-todo-controls">
+        <span className="agent-todo-caption">
+          {finished
+            ? 'All tasks complete'
+            : paused || !running
+              ? 'Sample run paused'
+              : 'Sample agent run'}
+        </span>
+        {!finished && (
+          <button
+            className="demo-text-button"
+            disabled={paused}
+            onClick={() => setRunning((value) => !value)}
+          >
+            {running ? <Pause size={13} /> : <Play size={13} />}
+            {running ? 'Pause' : 'Resume'}
+          </button>
+        )}
+        <Replay
+          onClick={() => {
+            setRun({ tick: 0, open: true });
+            setRunning(true);
+            setKeyboard(false);
+          }}
+        />
+      </div>
+      <span className="sr-only" role="status">
+        {completed} of {tasks.length} tasks completed{finished ? '. Plan finished.' : '.'}
+      </span>
+    </div>
+  );
+}
 
 export function PromptComposer() {
   const [value, setValue] = useState('');
@@ -145,57 +322,6 @@ export function StreamingResponse() {
             )}
           </button>
         </div>
-      </div>
-    </DemoStack>
-  );
-}
-export function ReasoningPanel() {
-  const [open, setOpen] = useState(false);
-  const id = useId();
-  return (
-    <DemoStack>
-      <div className="reasoning-card">
-        <button
-          className="reasoning-trigger"
-          aria-expanded={open}
-          aria-controls={id}
-          onClick={() => setOpen(!open)}
-        >
-          <span className="assistant-avatar">
-            <Sparkles size={16} />
-          </span>
-          <span>
-            Three steps, one useful answer.<small>Activity complete · sample log</small>
-          </span>
-          <ChevronDown size={17} style={{ transform: open ? 'rotate(180deg)' : undefined }} />
-        </button>
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              id={id}
-              className="reasoning-log"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {[
-                ['Read the project brief', 'Identified audience and constraints.'],
-                ['Compared three directions', 'Reviewed hierarchy, navigation, and tone.'],
-                ['Prepared the recommendation', 'A quiet canvas with one warm accent.'],
-              ].map(([title, desc]) => (
-                <div key={title}>
-                  <Check size={14} />
-                  <span>
-                    {title}
-                    <small>{desc}</small>
-                  </span>
-                </div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <div className="reasoning-answer">Start with less. Give the useful things more room.</div>
       </div>
     </DemoStack>
   );
@@ -391,146 +517,257 @@ export function FileUpload() {
     </DemoStack>
   );
 }
-export function AdaptiveStepper() {
+export function Stepper() {
   const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState(1);
   const [name, setName] = useState('');
   const [plan, setPlan] = useState('Personal');
+  const [keyboard, setKeyboard] = useState(false);
+  const { reduced } = usePlayback();
   const id = useId();
+  const go = (next: number) => {
+    setDirection(next > step ? 1 : -1);
+    setStep(next);
+  };
   return (
     <DemoStack>
-      <motion.div layout className="stepper-card" transition={spring}>
-        <div className="stepper-progress">
-          {[0, 1, 2].map((n) => (
-            <span key={n} className={step >= n ? 'active' : ''}>
-              {step > n ? <Check size={13} /> : n + 1}
-            </span>
-          ))}
-        </div>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <span className="demo-eyebrow">
-              {step === 3 ? 'COMPLETE' : `STEP ${step + 1} OF 3`}
-            </span>
-            <h3>
-              {
-                [
-                  'Give your space a name.',
-                  'Room for just you. Or a few.',
-                  'Does this feel like you?',
-                  'Good things start here.',
-                ][step]
-              }
-            </h3>
-            {step === 0 ? (
-              <>
-                <label htmlFor={id} className="sr-only">
-                  Workspace name
-                </label>
-                <input
-                  id={id}
-                  className="plain-input"
-                  placeholder="e.g. The Sunday Studio"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </>
-            ) : step === 1 ? (
-              <div className="plan-options">
-                {['Personal', 'Together'].map((x) => (
-                  <button
-                    key={x}
-                    aria-pressed={plan === x}
-                    className={plan === x ? 'active' : ''}
-                    onClick={() => setPlan(x)}
-                  >
-                    {x}
-                    {plan === x && <Check size={16} />}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="workspace-summary">
-                <span className="demo-symbol">
-                  <Sparkles size={23} />
+      <div
+        className="rb-stepper"
+        data-instant={reduced || keyboard || undefined}
+        onKeyDownCapture={() => setKeyboard(true)}
+        onPointerDownCapture={() => setKeyboard(false)}
+      >
+        <ol className="rb-stepper-indicators" aria-label="Setup progress">
+          {['Welcome', 'Workspace', 'Plan', 'Review'].map((label, index) => (
+            <li key={label}>
+              <button
+                aria-label={`Go to step ${index + 1}: ${label}`}
+                aria-current={step === index ? 'step' : undefined}
+                disabled={index > 1 && !name.trim()}
+                data-state={step > index ? 'complete' : step === index ? 'active' : 'pending'}
+                onClick={() => go(index)}
+              >
+                {step > index ? <Check size={16} /> : step === index ? <span /> : index + 1}
+              </button>
+              {index < 3 && (
+                <span className="rb-stepper-connector">
+                  <i style={{ transform: `scaleX(${step > index ? 1 : 0})` }} />
                 </span>
-                <strong>{name}</strong>
-                <small>
-                  {plan === 'Personal'
-                    ? 'A little space for your ideas.'
-                    : 'A little space for shared ideas.'}
-                </small>
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-        <div className="row stepper-actions">
-          {step > 0 && step < 3 ? (
-            <button className="demo-text-button" onClick={() => setStep(step - 1)}>
-              <ArrowLeft size={14} /> Back
+              )}
+            </li>
+          ))}
+        </ol>
+        <div className="rb-stepper-stage">
+          <AnimatePresence initial={false} mode="wait" custom={direction}>
+            <motion.div
+              key={step}
+              className="rb-stepper-content"
+              custom={direction}
+              variants={{
+                enter: (dir: number) => ({ opacity: 0, transform: `translateX(${dir * 32}px)` }),
+                shown: { opacity: 1, transform: 'translateX(0px)' },
+                leave: (dir: number) => ({ opacity: 0, transform: `translateX(${-dir * 24}px)` }),
+              }}
+              initial="enter"
+              animate="shown"
+              exit="leave"
+              transition={{ duration: reduced || keyboard ? 0 : 0.18, ease: [0.23, 1, 0.32, 1] }}
+            >
+              <h3>
+                {
+                  [
+                    'A new space for your ideas.',
+                    'What should we call it?',
+                    'Choose how you work.',
+                    'Ready to make it yours?',
+                    'Your workspace is ready.',
+                  ][step]
+                }
+              </h3>
+              {step === 0 ? (
+                <>
+                  <p>Set up a sample workspace in a few small steps.</p>
+                  <div className="rb-stepper-welcome">
+                    <Sparkles size={35} />
+                    <span>Make something worth sharing.</span>
+                  </div>
+                </>
+              ) : step === 1 ? (
+                <>
+                  <p>You can change this later.</p>
+                  <label htmlFor={id}>Workspace name</label>
+                  <input
+                    id={id}
+                    className="plain-input"
+                    value={name}
+                    placeholder="The Sunday Studio"
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </>
+              ) : step === 2 ? (
+                <>
+                  <p>A little room for you, or for the whole team.</p>
+                  <div className="plan-options">
+                    {['Personal', 'Together'].map((option) => (
+                      <button
+                        key={option}
+                        className={plan === option ? 'active' : ''}
+                        aria-pressed={plan === option}
+                        onClick={() => setPlan(option)}
+                      >
+                        {option}
+                        {plan === option && <Check size={16} />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p>
+                    {step === 4
+                      ? 'This local demo has completed its setup.'
+                      : 'Review your choices before completing setup.'}
+                  </p>
+                  <div className="rb-stepper-summary">
+                    <strong>{name || 'Your workspace'}</strong>
+                    <span>{plan} workspace</span>
+                    {step === 4 && <Check size={22} />}
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+        <div className="rb-stepper-footer">
+          {step > 0 && step < 4 ? (
+            <button className="demo-text-button" onClick={() => go(step - 1)}>
+              Back
             </button>
           ) : (
             <span />
           )}
           <button
             className="demo-button primary"
-            disabled={step === 0 && !name.trim()}
-            onClick={() => {
-              if (step === 3) {
-                setStep(0);
-                setName('');
-              } else setStep(step + 1);
-            }}
+            disabled={step === 1 && !name.trim()}
+            onClick={() => (step === 4 ? (setName(''), setPlan('Personal'), go(0)) : go(step + 1))}
           >
-            {['Continue', 'Review', 'Create sample space', 'Start again'][step]}
+            {step === 4 ? 'Start again' : step === 3 ? 'Complete' : 'Continue'}
             <ArrowRight size={14} />
           </button>
         </div>
-      </motion.div>
+        <span className="sr-only" role="status">
+          {step === 4 ? 'Setup complete' : `Step ${step + 1} of 4`}
+        </span>
+      </div>
     </DemoStack>
   );
 }
-export function ScrollExpand() {
-  const [progress, setProgress] = useState(0);
-  const { reduced } = usePlayback();
-  const scale = reduced ? 1 : 0.58 + progress * 0.42;
+
+export function LatticeLoader() {
+  const [pattern, setPattern] = useState('Orbit');
+  const [status, setStatus] = useState<'working' | 'done' | 'error'>('working');
+  const [playing, setPlaying] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
+  const { reduced, paused, speed } = usePlayback();
+  useTicker(() => setElapsed((time) => time + 1), status === 'working' && playing ? 100 : null);
+  const grid = pattern === 'Orbit' ? 3 : 4;
+  const cells = Array.from({ length: grid * grid }, (_, index) => {
+    const x = index % grid,
+      y = Math.floor(index / grid);
+    return pattern === 'Orbit'
+      ? [0, 1, 2, 7, -1, 3, 6, 5, 4][index]
+      : pattern === 'Sweep'
+        ? x + y
+        : Math.max(Math.abs(x - 1.5), Math.abs(y - 1.5));
+  });
+  const marks =
+    status === 'error'
+      ? grid === 3
+        ? [0, 2, 4, 6, 8]
+        : [0, 3, 5, 6, 9, 10, 12, 15]
+      : grid === 3
+        ? [2, 3, 5, 7]
+        : [7, 8, 10, 13];
+  const restart = () => {
+    setElapsed(0);
+    setStatus('working');
+    setPlaying(true);
+  };
   return (
-    <div
-      className="scroll-expand"
-      tabIndex={0}
-      aria-label="Scrollable landscape expansion demo"
-      onScroll={(e) => setProgress(Math.min(1, e.currentTarget.scrollTop / 240))}
-    >
-      <div className="scroll-expand-track">
-        <div className="scroll-expand-sticky">
-          <div
-            className="expand-landscape"
-            style={{
-              transform: `scale(${scale})`,
-              borderRadius: reduced ? 0 : 48 * (1 - progress),
-            }}
-          >
-            <span className="landscape-sun" />
-            <i className="landscape-hill landscape-far" />
-            <i className="landscape-hill landscape-near" />
-            <div>
-              <h3>
-                Let the world
-                <br />
-                open up.
-              </h3>
-            </div>
-          </div>
-          <span className="scroll-instruction">
-            {progress > 0.8 ? 'A little more room to breathe.' : 'SCROLL TO EXPLORE ↓'}
-          </span>
+    <DemoStack>
+      <div className="lattice-demo" data-state={status}>
+        <div
+          className="lattice-matrix"
+          aria-hidden="true"
+          style={{ gridTemplateColumns: `repeat(${grid}, 7px)` }}
+        >
+          {cells.map((phase, index) => (
+            <span
+              key={`${pattern}-${index}`}
+              className="lattice-cell"
+              data-on={marks.includes(index)}
+              data-hole={phase < 0}
+              style={{
+                animationDelay: `${(-phase * 0.12) / speed}s`,
+                animationDuration: `${(pattern === 'Orbit' ? 1.2 : 1.05) / speed}s`,
+                animationPlayState:
+                  playing && !paused && !reduced && status === 'working' ? 'running' : 'paused',
+                animationName: reduced || status !== 'working' || phase < 0 ? 'none' : undefined,
+              }}
+            />
+          ))}
         </div>
+        <strong>
+          {status === 'working'
+            ? playing && !paused
+              ? 'Thinking'
+              : 'Paused'
+            : status === 'done'
+              ? 'Done in'
+              : 'Failed after'}
+        </strong>
+        <span className="lattice-timer" aria-hidden="true">
+          {(elapsed / 10).toFixed(1)}s
+        </span>
+        <span role="status" className="sr-only">
+          {status === 'working'
+            ? 'Sample agent task in progress'
+            : status === 'done'
+              ? 'Sample agent task completed'
+              : 'Sample agent task failed'}
+        </span>
       </div>
-    </div>
+      <div className="small-segments" aria-label="Lattice pattern">
+        {['Orbit', 'Sweep', 'Pulse'].map((name) => (
+          <button
+            key={name}
+            className={pattern === name ? 'active' : ''}
+            aria-pressed={pattern === name}
+            onClick={() => setPattern(name)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <div className="lattice-actions">
+        {status === 'working' ? (
+          <>
+            <button className="demo-text-button" onClick={() => setPlaying(!playing)}>
+              {playing ? 'Pause' : 'Resume'}
+            </button>
+            <button className="demo-button" onClick={() => setStatus('done')}>
+              <Check size={14} />
+              Complete
+            </button>
+            <button className="demo-text-button" onClick={() => setStatus('error')}>
+              Fail
+            </button>
+          </>
+        ) : (
+          <Replay onClick={restart} />
+        )}
+      </div>
+      <Hint>Simulated agent activity</Hint>
+    </DemoStack>
   );
 }

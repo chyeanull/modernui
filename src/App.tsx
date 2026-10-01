@@ -40,10 +40,11 @@ import {
   X,
   ChartNoAxesCombined,
 } from 'lucide-react';
-import { categories, patterns } from './data/patterns';
+import { categories, patterns, recentPatterns } from './data/patterns';
 import type { Pattern } from './data/patterns';
 import { sources, researchDate } from './data/research';
 import { demos } from './demos/registry';
+import { FlowShader } from './demos/visual';
 import { standaloneSources, sourceLoaders } from 'virtual:pattern-sources';
 import { copyText, PlaybackContext, useLocalState } from './demos/shared';
 import { SidebarNav } from './components/SidebarNav';
@@ -70,7 +71,7 @@ const featuredOrder = [
   'thinking-orb',
   'rolling-numbers',
   'tilt-card',
-  'sliding-tabs',
+  'motion-tabs',
   'chart-scrubber',
   'morphing-button',
 ];
@@ -92,8 +93,15 @@ function navigate(path: string) {
 function Logo() {
   return (
     <a href="#/" className="brand" aria-label="Modern UI home">
-      <span className="brand-mark">
-        <Asterisk size={26} strokeWidth={2.4} />
+      <span className="brand-mark" aria-hidden="true">
+        {[0, 1, 2, 7, -1, 3, 6, 5, 4].map((phase, index) => (
+          <span
+            key={index}
+            className="brand-lattice-cell"
+            data-hole={phase < 0 || undefined}
+            style={{ animationDelay: `${-phase * 0.36}s` }}
+          />
+        ))}
       </span>
       <span>
         modern<span className="brand-light">ui</span>
@@ -396,7 +404,7 @@ export default function App() {
             <div className="topbar-actions">
               <span className="live-label">
                 <span />
-                64 working examples
+                {patterns.length} working examples
               </span>
               <button
                 aria-label="Search playbook"
@@ -415,7 +423,7 @@ export default function App() {
               <div className="empty-state">
                 <Asterisk size={40} />
                 <h1>This page wandered off.</h1>
-                <p>There are 64 other good places to start.</p>
+                <p>There are {patterns.length} other good places to start.</p>
                 <a href="#/" className="primary-button">
                   Back to the playbook <ArrowRight size={16} />
                 </a>
@@ -435,200 +443,218 @@ export default function App() {
               <Foundations reduced={reduced} setReduced={setReduced} />
             ) : (
               <div className="catalog-page">
-                <div className="page-intro">
-                  <div className="page-title-row">
-                    <h1>
-                      {category
-                        ? category.name
-                        : isSaved
-                          ? 'Good ideas, kept close.'
-                          : isNew
-                            ? 'A few new possibilities.'
-                            : 'Interfaces worth feeling.'}
-                    </h1>
-                  </div>
-                  <p>
-                    {category
-                      ? category.description
-                      : isSaved
-                        ? 'Your own little collection of things worth coming back to.'
-                        : isNew
-                          ? 'The latest additions to a growing interaction playbook.'
-                          : 'A considered collection of modern UI patterns. Explore the details. Play with the possibilities.'}
-                  </p>
-                </div>
-                {!category && !isSaved && !isNew && (
-                  <section className="feature-banner">
-                    <div className="banner-copy">
-                      <h2>
-                        Less ordinary.
-                        <br />
-                        More <em>extraordinary.</em>
-                      </h2>
-                      <p>64 live experiments in what an interface can feel like.</p>
-                      <a href="#/pattern/morphing-modal">
-                        Find your next good idea <ArrowUpRight size={16} />
-                      </a>
+                {(category || isSaved || isNew) && (
+                  <div className="page-intro">
+                    <div className="page-title-row">
+                      <h1>
+                        {category
+                          ? category.name
+                          : isSaved
+                            ? 'Good ideas, kept close.'
+                            : isNew
+                              ? 'A few new possibilities.'
+                              : 'Interfaces worth feeling.'}
+                      </h1>
                     </div>
-                    <div className="banner-art" aria-hidden="true">
-                      <div className="art-orbit orbit-a" />
-                      <div className="art-orbit orbit-b" />
-                      <div className="art-orbit orbit-c" />
-                      <div className="art-sphere" />
-                      <div className="art-chip chip-one">
-                        <span className="chip-check">
-                          <Check size={13} />
-                        </span>{' '}
-                        A little more delightful.
-                      </div>
-                      <div className="art-chip chip-two">
-                        <MousePointer2 size={14} />
-                        Made to move.
-                      </div>
-                      <span className="art-cross">+</span>
-                    </div>
-                  </section>
-                )}
-                <div className="catalog-toolbar">
-                  <div className="collection-tabs">
-                    <button
-                      className={filter === 'all' ? 'active' : ''}
-                      onClick={() => setFilter('all')}
-                    >
-                      {category ? 'All examples' : isSaved ? 'Saved patterns' : 'All patterns'}
-                      <span>{category ? 8 : isSaved ? saved.length : patterns.length}</span>
-                    </button>
-                    {!category && !isSaved && (
-                      <button
-                        className={filter === 'featured' ? 'active' : ''}
-                        onClick={() => setFilter('featured')}
-                      >
-                        <Sparkles size={13} /> The highlights
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="catalog-meta">
-                  <span>
-                    {filtered.length} patterns to explore <span className="meta-divider">/</span>{' '}
-                    <span>Every example is live. Go ahead, interact.</span>
-                  </span>
-                  <Select.Root
-                    items={sortOptions}
-                    value={sort}
-                    onValueChange={(value) => value && setSort(value)}
-                  >
-                    <Select.Trigger className="sort-trigger" aria-label="Sort patterns">
-                      <SlidersHorizontal size={15} aria-hidden="true" />
-                      <span className="sort-label">Sort by</span>
-                      <Select.Value className="sort-value" />
-                      <Select.Icon className="sort-chevron">
-                        <ChevronDown size={14} />
-                      </Select.Icon>
-                    </Select.Trigger>
-                    <Select.Portal>
-                      <Select.Positioner
-                        className="sort-positioner"
-                        positionMethod="fixed"
-                        align="end"
-                        sideOffset={8}
-                        alignItemWithTrigger={false}
-                      >
-                        <Select.Popup className="sort-popup">
-                          <Select.List>
-                            {sortOptions.map(({ value, label, description, icon: Icon }) => (
-                              <Select.Item key={value} value={value} className="sort-option">
-                                <span className="sort-option-icon">
-                                  <Icon size={17} aria-hidden="true" />
-                                </span>
-                                <span className="sort-option-copy">
-                                  <Select.ItemText>{label}</Select.ItemText>
-                                  <span className="sort-description">{description}</span>
-                                </span>
-                                <Select.ItemIndicator className="sort-check">
-                                  <Check size={16} />
-                                </Select.ItemIndicator>
-                              </Select.Item>
-                            ))}
-                          </Select.List>
-                        </Select.Popup>
-                      </Select.Positioner>
-                    </Select.Portal>
-                  </Select.Root>
-                </div>
-                {filtered.length ? (
-                  <div className="pattern-grid">
-                    {filtered.map((p) => (
-                      <article className="pattern-card" key={p.id} data-pattern={p.id}>
-                        <LazyDemo pattern={p} />
-                        <div className="pattern-card-info">
-                          <div className="pattern-card-top">
-                            <a href={`#/pattern/${p.id}`}>
-                              <h2>{p.name}</h2>
-                              {p.new && <span className="new-label">NEW</span>}
-                              <ArrowUpRight className="card-open-arrow" size={16} />
-                            </a>
-                            <button
-                              className={`save-button ${saved.includes(p.id) ? 'saved' : ''}`}
-                              aria-label={`${saved.includes(p.id) ? 'Unsave' : 'Save'} ${p.name}`}
-                              aria-pressed={saved.includes(p.id)}
-                              onClick={() => toggleSave(p.id)}
-                            >
-                              <Bookmark
-                                size={16}
-                                fill={saved.includes(p.id) ? 'currentColor' : 'none'}
-                              />
-                            </button>
-                          </div>
-                          <p>{p.description}</p>
-                          <div className="card-category">
-                            <span>{categories.find((c) => c.id === p.category)?.name}</span>
-                            <span className="card-tech">{p.tags[0]}</span>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="empty-state">
-                    <Bookmark size={32} />
-                    <h2>{isSaved ? 'A little room for inspiration.' : 'No patterns found.'}</h2>
                     <p>
-                      {isSaved
-                        ? 'Save any pattern with the bookmark icon. It’ll be right here.'
-                        : 'Choose a different filter to explore the collection.'}
+                      {category
+                        ? category.description
+                        : isSaved
+                          ? 'Your own little collection of things worth coming back to.'
+                          : isNew
+                            ? 'The latest additions to a growing interaction playbook.'
+                            : 'A considered collection of modern UI patterns. Explore the details. Play with the possibilities.'}
                     </p>
-                    <button
-                      className="primary-button"
-                      onClick={() => {
-                        setFilter('all');
-                        if (isSaved) navigate('');
-                      }}
-                    >
-                      Explore the collection <ArrowRight size={15} />
-                    </button>
                   </div>
                 )}
-                <div className="catalog-bottom">
-                  <Asterisk size={22} />
-                  <p>
-                    Good design is a collection of thoughtful decisions.
-                    <br />
-                    <span>Here are 64 places to start.</span>
-                  </p>
-                  <a href="#/research">
-                    Meet the inspirations <ArrowUpRight size={14} />
-                  </a>
-                </div>
+                {!category && !isSaved && !isNew && (
+                  <>
+                    <section className="feature-banner" aria-labelledby="home-title">
+                      <div className="banner-mesh" aria-hidden="true">
+                        <FlowShader palette={3} flow={2.4} />
+                      </div>
+                      <div className="banner-copy">
+                        <h1 id="home-title">A collection of modern UI patterns.</h1>
+                        <p className="banner-introduction">
+                          I've been collecting new interface and interaction designs. Decided to
+                          turn a large bookmark list of sites into a personal library. Make sure you
+                          check out the source material here:{' '}
+                          <a href="#/research">Research &amp; Source</a>.
+                        </p>
+                        <div className="live-pattern-counter" role="status">
+                          <span className="counter-indicator" aria-hidden="true" />
+                          <strong>{patterns.length}</strong>
+                          <span>live experiments</span>
+                        </div>
+                      </div>
+                      <div className="banner-author">
+                        <p className="author-credit">made and managed by</p>
+                        <a href="https://roberthilsky.com/" target="_blank" rel="noreferrer">
+                          roberthilsky.com <ExternalLink size={13} aria-hidden="true" />
+                        </a>
+                      </div>
+                    </section>
+                    <section className="home-changelog" aria-labelledby="changelog-title">
+                      <div className="changelog-heading">
+                        <h2 id="changelog-title">Changelog</h2>
+                        <span>Latest 10 patterns</span>
+                      </div>
+                      <ol>
+                        {recentPatterns.slice(0, 10).map((pattern) => (
+                          <li key={pattern.id}>
+                            <a href={`#/pattern/${pattern.id}`}>
+                              <span>{pattern.name}</span>
+                              <ArrowUpRight size={15} aria-hidden="true" />
+                            </a>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  </>
+                )}
+                {(category || isSaved || isNew) && (
+                  <>
+                    <div className="catalog-toolbar">
+                      <div className="collection-tabs">
+                        <button
+                          className={filter === 'all' ? 'active' : ''}
+                          onClick={() => setFilter('all')}
+                        >
+                          {category ? 'All examples' : isSaved ? 'Saved patterns' : 'All patterns'}
+                          <span>
+                            {category
+                              ? patterns.filter((pattern) => pattern.category === category.id)
+                                  .length
+                              : isSaved
+                                ? saved.length
+                                : patterns.length}
+                          </span>
+                        </button>
+                        {!category && !isSaved && (
+                          <button
+                            className={filter === 'featured' ? 'active' : ''}
+                            onClick={() => setFilter('featured')}
+                          >
+                            <Sparkles size={13} /> The highlights
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="catalog-meta">
+                      <span>
+                        {filtered.length} patterns to explore{' '}
+                        <span className="meta-divider">/</span>{' '}
+                        <span>Every example is live. Go ahead, interact.</span>
+                      </span>
+                      <Select.Root
+                        items={sortOptions}
+                        value={sort}
+                        onValueChange={(value) => value && setSort(value)}
+                      >
+                        <Select.Trigger className="sort-trigger" aria-label="Sort patterns">
+                          <SlidersHorizontal size={15} aria-hidden="true" />
+                          <span className="sort-label">Sort by</span>
+                          <Select.Value className="sort-value" />
+                          <Select.Icon className="sort-chevron">
+                            <ChevronDown size={14} />
+                          </Select.Icon>
+                        </Select.Trigger>
+                        <Select.Portal>
+                          <Select.Positioner
+                            className="sort-positioner"
+                            positionMethod="fixed"
+                            align="end"
+                            sideOffset={8}
+                            alignItemWithTrigger={false}
+                          >
+                            <Select.Popup className="sort-popup">
+                              <Select.List>
+                                {sortOptions.map(({ value, label, description, icon: Icon }) => (
+                                  <Select.Item key={value} value={value} className="sort-option">
+                                    <span className="sort-option-icon">
+                                      <Icon size={17} aria-hidden="true" />
+                                    </span>
+                                    <span className="sort-option-copy">
+                                      <Select.ItemText>{label}</Select.ItemText>
+                                      <span className="sort-description">{description}</span>
+                                    </span>
+                                    <Select.ItemIndicator className="sort-check">
+                                      <Check size={16} />
+                                    </Select.ItemIndicator>
+                                  </Select.Item>
+                                ))}
+                              </Select.List>
+                            </Select.Popup>
+                          </Select.Positioner>
+                        </Select.Portal>
+                      </Select.Root>
+                    </div>
+                    {filtered.length ? (
+                      <div className="pattern-grid">
+                        {filtered.map((p) => (
+                          <article className="pattern-card" key={p.id} data-pattern={p.id}>
+                            <LazyDemo pattern={p} />
+                            <div className="pattern-card-info">
+                              <div className="pattern-card-top">
+                                <a href={`#/pattern/${p.id}`}>
+                                  <h2>{p.name}</h2>
+                                  {p.new && <span className="new-label">NEW</span>}
+                                  <ArrowUpRight className="card-open-arrow" size={16} />
+                                </a>
+                                <button
+                                  className={`save-button ${saved.includes(p.id) ? 'saved' : ''}`}
+                                  aria-label={`${saved.includes(p.id) ? 'Unsave' : 'Save'} ${p.name}`}
+                                  aria-pressed={saved.includes(p.id)}
+                                  onClick={() => toggleSave(p.id)}
+                                >
+                                  <Bookmark
+                                    size={16}
+                                    fill={saved.includes(p.id) ? 'currentColor' : 'none'}
+                                  />
+                                </button>
+                              </div>
+                              <p>{p.description}</p>
+                              <div className="card-category">
+                                <span>{categories.find((c) => c.id === p.category)?.name}</span>
+                                <span className="card-tech">{p.tags[0]}</span>
+                              </div>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <Bookmark size={32} />
+                        <h2>{isSaved ? 'A little room for inspiration.' : 'No patterns found.'}</h2>
+                        <p>
+                          {isSaved
+                            ? 'Save any pattern with the bookmark icon. It’ll be right here.'
+                            : 'Choose a different filter to explore the collection.'}
+                        </p>
+                        <button
+                          className="primary-button"
+                          onClick={() => {
+                            setFilter('all');
+                            if (isSaved) navigate('');
+                          }}
+                        >
+                          Explore the collection <ArrowRight size={15} />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </main>
-          <footer className="site-footer">
-            <span>
-              modernui. <span>An interaction playbook.</span>
-            </span>
-            <span>Made with curiosity & a little obsession.</span>
-          </footer>
+          {route && (
+            <footer className="site-footer">
+              <span>
+                modernui. <span>An interaction playbook.</span>
+              </span>
+              <span>Made with curiosity & a little obsession.</span>
+            </footer>
+          )}
         </div>
         <SearchDialog open={commandOpen} setOpen={setCommandOpen} />
         <Toaster theme={theme} position="bottom-right" closeButton richColors />
@@ -682,7 +708,7 @@ function SearchDialog({ open, setOpen }: { open: boolean; setOpen: (v: boolean) 
             </Command.List>
             <div className="command-footer">
               ↑ ↓ to explore <span>↵ to open</span>
-              <span>64 possibilities</span>
+              <span>{patterns.length} possibilities</span>
             </div>
           </Command>
         </Dialog.Popup>
@@ -833,9 +859,13 @@ function PatternDetail({
         ) : (
           <div className="source-view">
             <div className="source-setup">
-              <p>One file for your React + TypeScript app. Styles and helpers are included.</p>
+              <p>
+                Use an existing React + TypeScript app (tested with React 19). Each file includes
+                its styles and helpers; no Tailwind setup or app provider is needed.
+              </p>
               <div className="source-step">
                 <h3>1. Install dependencies</h3>
+                {bundle.install && <p>Run this in your project folder.</p>}
                 {bundle.install ? (
                   <div className="source-command">
                     <code>{bundle.install}</code>
@@ -850,11 +880,15 @@ function PatternDetail({
               <div className="source-step">
                 <h3>2. Copy the component</h3>
                 <p>
-                  Use “Copy component” above and save it as <code>{bundle.filename}</code>.
+                  Use “Copy component” above and save it as <code>src/{bundle.filename}</code>.
                 </p>
               </div>
               <div className="source-step">
                 <h3>3. Use it in your page</h3>
+                <p>
+                  Paste this into <code>src/App.tsx</code> to try it. For another page, adjust the
+                  import path to where you saved the component.
+                </p>
                 <div className="source-command">
                   <code>{bundle.usage}</code>
                   <button aria-label="Copy usage example" onClick={() => copy(bundle.usage)}>
@@ -987,7 +1021,7 @@ function Research() {
       <div className="research-summary">
         <div>
           <strong>{sources.length}</strong>
-          <span>sources used in the app</span>
+          <span>source websites</span>
         </div>
         <div>
           <strong>{categories.length}</strong>
@@ -1009,16 +1043,8 @@ function Research() {
       <div className="research-intro">
         <h2>Study the idea. Build the understanding.</h2>
         <p>
-          Every source below contributed to a working example or a component used in this app. Each
-          note explains that connection. The examples are original interpretations of these
-          patterns; their detail pages link to the relevant inspiration. “Reviewed” means the page
-          or documentation exposed useful evidence, not that every interaction on the site was
-          tested.
-        </p>
-        <p>
-          Three themes shaped the collection: continuity between interface states, clear feedback
-          during asynchronous work, and expressive effects used where they help the experience.
-          Practical controls sit alongside experiments, each with its own purpose and limitations.
+          Each website below contributed to the collection and appears once, linked to its homepage.
+          Individual pattern pages include the specific references behind each example.
         </p>
       </div>
       <div className="research-toolbar">

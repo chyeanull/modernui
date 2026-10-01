@@ -156,3 +156,35 @@ test('touch navigation retains the active page without a sticky hover highlight'
   await expect(nav.locator('.nav-highlight-hover')).toHaveCSS('display', 'none');
   await context.close();
 });
+
+test('sidebar pattern preserves selection through hover, collapse, keyboard and reduced motion', async ({
+  page,
+}) => {
+  await page.goto('/#/pattern/sliding-sidebar');
+  const nav = page.getByRole('navigation', { name: 'Example sidebar' });
+  await expect(nav).toBeVisible();
+  await expectAligned(nav, 'a.active');
+  await nav.getByRole('link', { name: 'Magnetic dock', exact: true }).hover();
+  await expect(nav.locator('.nav-highlight-hover')).toHaveCSS('opacity', '1');
+  await expect(nav.getByRole('link', { name: 'Sliding tabs', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await nav.getByRole('link', { name: 'Magnetic dock', exact: true }).click();
+  await expectAligned(nav, 'a.active');
+  await nav.getByRole('button', { name: 'Collapse Navigation' }).click();
+  await expectAligned(nav, '.nav-category-row.active');
+  await nav.getByRole('button', { name: 'Expand Navigation' }).click();
+  await expectAligned(nav, 'a.active');
+  await nav.getByRole('link', { name: 'Your collection' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(nav.locator('.nav-highlight-active')).toHaveCSS('transition-property', 'none');
+  await expectAligned(nav, 'a.active');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await nav.getByRole('link', { name: 'Sliding sidebar', exact: true }).click();
+  await expect(nav.locator('.nav-highlight-active')).toHaveCSS('transition-property', 'none');
+  await expect(page).toHaveURL(/pattern\/sliding-sidebar$/);
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+  await expect(page.locator('pre code')).toContainText('function SidebarNav');
+  await expect(page.locator('pre code')).toContainText('type Bounds');
+});

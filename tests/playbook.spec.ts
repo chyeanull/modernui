@@ -1,18 +1,29 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { categories, patterns } from '../src/data/patterns';
+import { sources } from '../src/data/research';
 
-test('catalog filters, saved patterns, and theme survive reload', async ({ page }) => {
+test('homepage controls, saved patterns, and theme survive reload', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('.pattern-card')).toHaveCount(64);
+  await expect(page.locator('.pattern-card')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Filter patterns' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^(Grid|List) view$/ })).toHaveCount(0);
-  await expect(page.locator('.pattern-grid')).toHaveCSS('display', 'grid');
-  await page.getByRole('button', { name: 'The highlights' }).click();
-  await expect(page.locator('.pattern-card')).toHaveCount(
-    patterns.filter((pattern) => pattern.featured).length,
+  await expect(page.locator('.pattern-grid')).toHaveCount(0);
+  await expect(page.locator('.catalog-meta, .catalog-bottom, .site-footer')).toHaveCount(0);
+  await expect(page.locator('.catalog-page > :last-child')).toHaveClass('home-changelog');
+  await expect(page.getByRole('button', { name: 'The highlights' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /All patterns/ })).toHaveCount(0);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'A collection of modern UI patterns.',
   );
-  await page.getByRole('button', { name: /All patterns/ }).click();
+  await expect(page.getByRole('link', { name: 'Find your next good idea' })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Research & Source', exact: true }).click();
+  await expect(page).toHaveURL(/#\/research$/);
+  await page.goto('/#/category/visual');
+  await expect(page.locator('.pattern-card')).toHaveCount(
+    patterns.filter((pattern) => pattern.category === 'visual').length,
+  );
+  await expect(page.locator('.pattern-grid')).toHaveCSS('display', 'grid');
   await page.getByRole('button', { name: 'Save Shader mesh', exact: true }).click();
   await page.getByRole('link', { name: /Your collection/ }).click();
   await expect(page.locator('.pattern-card')).toHaveCount(1);
@@ -41,9 +52,7 @@ test('command search supports keyboard selection and Escape', async ({ page }) =
 });
 
 for (const category of categories) {
-  test(`${category.name}: all eight examples render and expose their own source`, async ({
-    page,
-  }) => {
+  test(`${category.name}: all examples render and expose their own source`, async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     for (const pattern of patterns.filter((p) => p.category === category.id)) {
@@ -186,14 +195,15 @@ test('AI flows are local, stoppable, and explicit about outcomes', async ({ page
   await page.getByRole('button', { name: 'Keep as is' }).click();
   await expect(page.getByText('No changes. All good.')).toBeVisible();
   await page.goto('/#/pattern/adaptive-stepper');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
   await page.getByRole('textbox', { name: 'Workspace name' }).fill('Sunday Studio');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Together', exact: true }).click();
-  await page.getByRole('button', { name: 'Review', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByText('Sunday Studio', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Create sample space' }).click();
-  await expect(page.getByText('Good things start here.')).toBeVisible();
+  await page.getByRole('button', { name: 'Complete', exact: true }).click();
+  await expect(page.getByText('Your workspace is ready.')).toBeVisible();
 });
 
 test('upload keeps files local and provides completion feedback', async ({ page }) => {
@@ -213,7 +223,7 @@ test('upload keeps files local and provides completion feedback', async ({ page 
 });
 
 test('navigation interactions and context menus work', async ({ page }) => {
-  await page.goto('/#/pattern/sliding-tabs');
+  await page.goto('/#/pattern/motion-tabs');
   const tab = page.getByRole('tab', { name: 'Overview' });
   await tab.focus();
   await page.keyboard.press('ArrowRight');
@@ -249,7 +259,7 @@ test('mobile navigation closes on selection and source notes remain accessible',
 
 test('research lists sources used in the app and supports search', async ({ page }) => {
   await page.goto('/#/research');
-  await expect(page.locator('.research-row')).toHaveCount(15);
+  await expect(page.locator('.research-row')).toHaveCount(sources.length);
   await page.getByRole('textbox', { name: 'Search research sources' }).fill('NumberFlow');
   await expect(page.locator('.research-row')).toHaveCount(1);
   await expect(page.locator('.research-status')).toHaveText('Reviewed');
@@ -287,7 +297,7 @@ test('representative screens have no serious or critical accessibility violation
     '',
     'pattern/inline-validation',
     'pattern/otp-input',
-    'pattern/sliding-tabs',
+    'pattern/motion-tabs',
     'pattern/chart-scrubber',
     'pattern/morphing-modal',
     'research',
